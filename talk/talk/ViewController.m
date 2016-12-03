@@ -17,6 +17,8 @@
 - (void)viewDidLoad {
     [super viewDidLoad];
     // Do any additional setup after loading the view, typically from a nib.
+    [[CMHXMMPPManager sharedManager] loginWithJID:[XMPPJID jidWithUser:@"Jim" domain:@"changminghuidemacbook-pro.local" resource:@"ios"] andPassword:@"123456"];
+    [[CMHXMMPPManager sharedManager] registerWithJID:[XMPPJID jidWithUser:@"Alex" domain:@"changminghuidemacbook-pro.local" resource:@"ios"] andPassword:@"123456"];
 }
 
 
