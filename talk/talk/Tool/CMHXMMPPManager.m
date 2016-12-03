@@ -12,12 +12,16 @@
 #import "DDTTYLogger.h"
 
 static CMHXMMPPManager *instance;
-@interface CMHXMMPPManager () <XMPPStreamDelegate>
+@interface CMHXMMPPManager () <XMPPStreamDelegate, XMPPAutoPingDelegate, XMPPReconnectDelegate>
 //数据流，核心类
 @property (nonatomic, strong) XMPPStream *xmppStream;
 @property (nonatomic, copy) NSString *passWord;
 //是注册还是登录
 @property (nonatomic, assign) BOOL registerAccount;
+//心跳检测模块
+@property (nonatomic, strong) XMPPAutoPing *xmppAutoping;
+//自动重连模块
+@property (nonatomic, strong) XMPPReconnect *xmppReconnect;
 @end
 
 
@@ -30,8 +34,32 @@ static CMHXMMPPManager *instance;
         instance = [CMHXMMPPManager new];
         //设置xmpp传输日志
         [instance setupLogging];
+        //设置模块
+        [instance setupModule];
     });
     return instance;
+}
+//设置模块
+- (void)setupModule{
+    //使用XEP协议时，选择对应的模块，模块的使用方式：1.创建模块对象  2.设置属性、代理   3.激活模块
+    /*
+     心跳模块
+     */
+    //心跳包的发送时间间隔
+    self.xmppAutoping.pingInterval = 5;
+    //心跳包的相应时限
+    self.xmppAutoping.pingTimeout = 3;
+    //是否相应对端的心跳包
+    self.xmppAutoping.respondsToQueries = YES;
+//    [self.xmppAutoping activate:self.xmppStream];
+    /*
+     自动重连模块
+     */
+    //首次断开连接后重连的延迟时间
+    self.xmppReconnect.reconnectDelay = 1;
+    //重连失败后定时进行重连
+    self.xmppReconnect.reconnectTimerInterval = 1;
+    [self.xmppReconnect activate:self.xmppStream];
 }
 - (void)setupLogging{
     //设置日志类型&级别
@@ -66,16 +94,42 @@ static CMHXMMPPManager *instance;
     } else {
         //进行登录
         [self.xmppStream authenticateWithPassword:self.passWord error:nil];
-        
     }
-    
-
-    
+}
+#pragma mark - XMPPReconnectDelegate
+//已经检测到非正常连接后调用
+//- (void)xmppReconnect:(XMPPReconnect *)sender didDetectAccidentalDisconnect:(SCNetworkReachabilityFlags)connectionFlags{
+//    //systemconfigration是最底层的获取网络状态的类库（c语言）->reachability(oc ios类库，但是不在xcode打包下载的api中)->AFN检测网络连接状态就是使用的reachability类库
+//    
+//}
+////设置是否应该以自动重连时调用（可能会根据网络情况的不同选择是否自动重联服务器）
+//- (BOOL)xmppReconnect:(XMPPReconnect *)sender shouldAttemptAutoReconnect:(SCNetworkReachabilityFlags)reachabilityFlags{
+//    return YES;
+//}
+#pragma mark - XMPPAutoPingDelegate
+//已经发送心跳包后调用
+-(void)xmppAutoPingDidSendPing:(XMPPAutoPing *)sender{
+    NSLog(@"发送心跳包后调用");
+}
+//已经接收到心跳报的相应后调用
+-(void)xmppAutoPingDidReceivePong:(XMPPAutoPing *)sender{
+    NSLog(@"接收到心跳包相应");
 }
 //已经注册成功后调用
 -(void)xmppStreamDidRegister:(XMPPStream *)sender{
     NSLog(@"注册成功");
 }
+//心跳包超时后调用
+-(void)xmppAutoPingDidTimeout:(XMPPAutoPing *)sender{
+    NSLog(@"连接出现问题");
+    //可以直接断开连接，再重新连接
+    [self.xmppStream disconnect];//系统有自动重连模块，会自动重新连接
+}
+
+
+
+
+
 //已经登陆后调用
 -(void)xmppStreamDidAuthenticate:(XMPPStream *)sender{
     NSLog(@"登录成功");
@@ -98,5 +152,21 @@ static CMHXMMPPManager *instance;
         [self.xmppStream addDelegate:self delegateQueue:dispatch_get_main_queue()];
     }
     return _xmppStream;
+}
+- (XMPPAutoPing *)xmppAutoping{
+    if (_xmppAutoping == nil) {
+       _xmppAutoping = [[XMPPAutoPing alloc] initWithDispatchQueue:dispatch_get_global_queue(0, 0)];
+        //设置代理，监听心跳情况
+        [_xmppAutoping addDelegate:self delegateQueue:dispatch_get_main_queue()];
+    }
+    return _xmppAutoping;
+}
+-(XMPPReconnect *)xmppReconnect{
+    if (_xmppReconnect == nil) {
+       _xmppReconnect = [[XMPPReconnect alloc] initWithDispatchQueue:dispatch_get_global_queue(0, 0)];
+        //设置代理
+        [_xmppReconnect addDelegate:self delegateQueue:dispatch_get_main_queue()];
+    }
+    return _xmppReconnect;
 }
 @end

@@ -27,6 +27,17 @@
  
 // List the modules you're using here:
 // (the following may not be a complete list)
+/*
+ 心跳检测模块
+ */
+#import "XMPPPing.h"//手动发送心跳包
+#import "XMPPAutoPing.h"//自动发送心跳包
+/*
+ 自动重连模块
+ */
+#import "XMPPReconnect.h"
+
+
 
 //#import "XMPPBandwidthMonitor.h"
 // 
